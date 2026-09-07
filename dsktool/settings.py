@@ -183,7 +183,7 @@ db_from_env = dj_database_url.config(conn_max_age=500)
 DATABASES['default'].update(db_from_env)
 
 # --- logging ---
-LOG_DIR = "/home/dsktooltest/django_logs"
+LOG_DIR = os.path.join(os.path.dirname(BASE_DIR), "django_logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 LOGGING = {
