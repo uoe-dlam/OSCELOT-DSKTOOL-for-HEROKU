@@ -21,6 +21,9 @@ from dsktool.rfc import Rfc
 from dsktool.models import Messages
 from dsktool.models import Logs
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
+import http.client as http_client
+import logging
+logger = logging.getLogger(__name__)
 
 
 from django.http import JsonResponse
@@ -31,7 +34,19 @@ import io
 from wsgiref.util import FileWrapper
 from django.http import StreamingHttpResponse
 
+from requests.sessions import Session
 
+_orig_prepare = Session.prepare_request
+
+def _prepare_no_get_body(self, request):
+    prepared = _orig_prepare(self, request)
+    if prepared.method in ("GET", "HEAD") and prepared.body is not None:
+        prepared.body = None
+        prepared.headers.pop("Content-Length", None)
+        prepared.headers.pop("Content-Type", None)
+    return prepared
+
+Session.prepare_request = _prepare_no_get_body
 
 # Globals
 # BB: BbRest object - required for all BbRest requests
@@ -109,7 +124,7 @@ def BbRestSetup(request, targetView=None, redirectRequired=False):
             request.session['target_view'] = targetView 
             return HttpResponseRedirect(reverse('get_3LO_token'))
         except:
-            logging.critical('BBRESTSETUP: Could not set BbREST in Session, Check Configuration KEY and SECRET.')
+            logging.critical(f'BBRESTSETUP: Exception while initializing BbRest: {e}', exc_info=True)
     else:
         logging.info('BBRESTSETUP: Found BbRest in session')
         BB = jsonpickle.decode(BB_JSON)
@@ -787,7 +802,8 @@ def get_API_token(request):
     if (code == None):
         exit()
 
-    user_bb = BbRest(KEY, SECRET, f"https://{LEARNFQDN}", code=code, redirect_uri=absolute_redirect_uri )    
+    user_bb = BbRest(KEY, SECRET, f"https://{LEARNFQDN}", code=code, redirect_uri=absolute_redirect_uri )
+
     BB_JSON = jsonpickle.encode(user_bb)
     request.session['BB_JSON'] = BB_JSON
 
